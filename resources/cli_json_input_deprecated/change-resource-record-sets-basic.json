@@ -1,0 +1,20 @@
+# These comments will be removed before the file is passed in
+# TODO: Update the comment and entry to change based on environment (TST/STG/PRD/etc)
+{
+  "Comment": "Add the DNS entry for {SERVICE} in PRD",
+  "Changes": [
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "{HOST}.",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [
+          {
+            "Value": "{RECORDVALUE}"
+          }
+        ]
+      }
+    }
+  ]
+}

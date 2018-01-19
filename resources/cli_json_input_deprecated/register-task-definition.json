@@ -1,0 +1,28 @@
+# These comments will be removed before the file is passed in
+# image: the full path of the image, including tag (ex: 165212154650.dkr.ecr.us-east-2.amazonaws.com/test1:0.1.0)
+# cpu: an ec2 has 1,024 cpu units per core, and this determines the ratio of allocations for this container
+#      all un-assigned units are spread to the containers, based on their cpu ratio
+# essential: if true, and there are other containers in the task, when this container fails, the other containers are killed as well
+# optional parameters:
+#   taskRoleArn: the role for the container to run as
+#   command: an array or values to pass into docker run as the CMD values
+{
+  "containerDefinitions": [
+    {
+      "name": "{SERVICE}",
+      "image": "{IMAGE}",
+      "cpu": 10,
+      "portMappings": [
+        {
+          "hostPort": 0,
+          "containerPort": 5555,
+          "protocol": "tcp"
+        }
+      ],
+      "memory": 300,
+      "essential": true
+    }
+  ],
+  "family": "{SERVICE}",
+  "taskRoleArn": "{ROLEARN}"
+}

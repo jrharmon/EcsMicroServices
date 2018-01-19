@@ -1,0 +1,17 @@
+# These comments will be removed before the file is passed in
+# TODO: Setup deploymentConfiguration property with minimumHealthyPercent to 50, to match console default
+# Services default to a maximum healthy percent of 200%, so that during deployments, new instances can be created and verified before stopping the existing one
+{
+    "cluster": "microservice-cluster",
+    "serviceName": "{SERVICE}",
+    "taskDefinition": "{SERVICE}",
+    "loadBalancers": [
+        {
+            "targetGroupArn": "{TARGETGROUP}",
+            "containerName": "{SERVICE}",
+            "containerPort": 5555
+        }
+    ],
+    "desiredCount": 1,
+    "role": "ecsServiceRole"
+}

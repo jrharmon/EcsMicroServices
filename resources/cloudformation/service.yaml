@@ -1,0 +1,118 @@
+#Defines the resources required by the service, and is used for initial creation and all updates
+#name the stack JeffService-ENV, replacing ENV with DEV, TST, STG or PRD (it should match !Sub ${ServiceName}-${EnvironmentName})
+
+Description: >
+  Create an ECS service, and all necessary pieces
+
+Parameters:
+  ServiceName:
+    Type: String
+    Default: JeffService
+  ClusterStackName:
+    Type: String
+    Default: ServiceCluster-DEV
+  ContainerImageTag:
+    Type: String
+    Default: latest
+  DesiredInstanceCount: #possibly remove this, and let it be updated manually below
+    Type: Number
+    Default: 1
+  EcsServiceRole: #a role that allows ECS service management to start/stop tasks.  this is not what the actual service containers run as, and can be a common role for all services
+    Type: String
+  ListenerRulePriority:
+    Type: Number
+    Default: 10
+  ListenerRuleHostName:
+    Type: String
+
+
+Resources:
+
+#dynamic resources that change between deployments
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub ${AWS::StackName}
+      TaskRoleArn: !Ref EcsTaskRole
+      ContainerDefinitions:
+        - Name: !Ref ServiceName
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ServiceName}:${ContainerImageTag}
+          Essential: true #if true, and there are other containers in the task, when this container fails, the other containers are killed as well
+          Cpu: 10         #an ec2 has 1,024 cpu units per core, and this determines the ratio of allocations for this container.  all un-assigned units are spread to the containers, based on their cpu ratio
+          Memory: 300
+          PortMappings:
+            - ContainerPort: 80
+          Environment:
+            - Name: Tag
+              Value: !Ref ContainerImageTag
+
+  Service:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Ref AWS::StackName
+      Cluster: !Ref ClusterStackName
+      Role: !Ref EcsServiceRole
+      DesiredCount: !Ref DesiredInstanceCount
+      TaskDefinition: !Ref TaskDefinition
+      LoadBalancers:
+        - ContainerName: !Ref ServiceName
+          ContainerPort: 80
+          TargetGroupArn: !Ref TargetGroup
+
+
+
+
+
+
+#static resources that should not change between deployments
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Ref AWS::StackName
+      VpcId:
+        Fn::ImportValue: !Sub ${ClusterStackName}-VpcId
+      Port: 80
+      Protocol: HTTP
+      Matcher:
+        HttpCode: 200-299
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 30
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}
+
+  ListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn:
+        Fn::ImportValue: !Sub ${ClusterStackName}-AlbListenerArn
+      Priority: !Ref ListenerRulePriority
+      Conditions:
+        - Field: host-header
+          Values:
+            - !Ref ListenerRuleHostName
+      Actions:
+        - TargetGroupArn: !Ref TargetGroup
+          Type: forward
+
+  EcsTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref AWS::StackName
+      Path: /
+      AssumeRolePolicyDocument: |
+        {
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": { "Service": [ "ecs-tasks.amazonaws.com" ]},
+                "Action": [ "sts:AssumeRole" ]
+            }]
+        }
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
